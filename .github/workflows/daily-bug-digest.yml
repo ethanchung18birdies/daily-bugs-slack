@@ -12,6 +12,7 @@ on:
       run_date:
         description: "Optional pretend run date in YYYY-MM-DD format. Example: 2026-05-29 reports May 28."
         required: false
+        default: ""
         type: string
       dry_run:
         description: "Print the digest without posting to Slack."
@@ -42,6 +43,7 @@ jobs:
 
       - name: Check scheduled run time
         id: schedule_guard
+        shell: bash
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
@@ -58,6 +60,7 @@ jobs:
 
       - name: Write Google service account key
         if: steps.schedule_guard.outputs.should_run == 'true'
+        shell: bash
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON_SECRET: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
@@ -74,6 +77,7 @@ jobs:
 
       - name: Send daily digest
         if: steps.schedule_guard.outputs.should_run == 'true'
+        shell: bash
         env:
           PRODUCT_FEEDBACK_SPREADSHEET_ID: 19JPqsVsE0hU-oBF5G02HdctrQBgTBudzQvFFyQHaj28
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ github.workspace }}/service-account.json
@@ -83,11 +87,22 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           args=()
-          if [ -n "$RUN_DATE" ]; then
-            args+=(--run-date "$RUN_DATE")
+
+          if [[ -n "${RUN_DATE:-}" ]]; then
+            if [[ "$RUN_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              args+=(--run-date "$RUN_DATE")
+            else
+              echo "Invalid run_date: '$RUN_DATE'. Expected YYYY-MM-DD."
+              exit 1
+            fi
           fi
-          if [ "$DRY_RUN" = "true" ]; then
+
+          if [[ "${DRY_RUN:-false}" == "true" ]]; then
             args+=(--dry-run)
           fi
+
+          printf 'Running daily_bug_digest.py with args:'
+          printf ' %q' "${args[@]}"
+          printf '\n'
 
           python daily_bug_digest.py "${args[@]}"
