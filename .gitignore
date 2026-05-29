@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.pyc
+logs/
+service-account.json
+daily-unresolved-bugs-*.json
