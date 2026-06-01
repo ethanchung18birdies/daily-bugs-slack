@@ -17,7 +17,7 @@ on:
       dry_run:
         description: "Print the digest without posting to Slack."
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
