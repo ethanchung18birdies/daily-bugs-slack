@@ -37,6 +37,17 @@ class ReportParserTests(unittest.TestCase):
 
         self.assertEqual([report.helpscout_url for report in reports], ["1", "2"])
 
+    def test_parse_source_rows_only_requires_core_columns(self) -> None:
+        values = [
+            ["HelpScout Url", "Category", "Feedback", "Date Submitted"],
+            ["1", "Bug", "App crashes when I finish round", "06/01/26"],
+        ]
+
+        reports = parse_source_rows("June", values, date(2026, 6, 1), date(2026, 6, 3))
+
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0].helpscout_url, "1")
+
     def test_clean_feedback_extracts_metadata(self) -> None:
         feedback = """Feedback from Dale Chu - ID: 69d8f641
 Dale Chu

@@ -13,6 +13,9 @@ SOURCE_COLUMNS = (
     "Category",
     "Feedback",
     "Date Submitted",
+)
+
+OPTIONAL_SOURCE_COLUMNS = (
     "Next Step",
     "Check CS Response",
 )
