@@ -100,6 +100,20 @@ class DailyBugDigestTests(unittest.TestCase):
         self.assertEqual(rows[0].feedback, "App freezes")
         self.assertEqual(rows[0].next_step, "Investigate")
 
+    def test_rows_from_values_only_requires_core_columns(self) -> None:
+        rows = rows_from_values(
+            "June",
+            [
+                ["HelpScout Url", "Category", "Feedback", "Date Submitted"],
+                ["123", "Bug", "App freezes", "06/01/26"],
+            ],
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].helpscout_url, "123")
+        self.assertEqual(rows[0].next_step, "")
+        self.assertEqual(rows[0].check_cs_response, "")
+
     def test_filter_daily_bugs_matches_bug_category_and_report_date(self) -> None:
         rows = [
             row(date_submitted="05/28/26"),

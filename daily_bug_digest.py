@@ -22,6 +22,8 @@ EXPECTED_COLUMNS = (
     "Category",
     "Feedback",
     "Date Submitted",
+)
+OPTIONAL_COLUMNS = (
     "Next Step",
     "Check CS Response",
 )
