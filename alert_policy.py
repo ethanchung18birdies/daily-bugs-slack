@@ -23,8 +23,9 @@ def decide_alert(
     should_alert = False
     reason = "threshold_not_met"
 
-    if issue.status in {"Closed", "Dismissed"}:
+    if issue.status in {"Resolved", "Closed", "Dismissed"}:
         reason = f"issue_status_{issue.status.casefold()}"
+        alert_type = "suppressed"
     elif issue.status == "Patched" and issue.patch_date:
         post_patch_count = _reports_after(issue.patch_date, reports)
         if post_patch_count >= settings.patched_alert_threshold:
@@ -33,6 +34,13 @@ def decide_alert(
             reason = "patched_issue_threshold_met"
         else:
             reason = "patched_issue_threshold_not_met"
+    elif existing_issue is not None and existing_issue.slack_message_ts:
+        if issue.new_since_last_alert > 0:
+            alert_type = "existing_issue_update"
+            should_alert = True
+            reason = "existing_issue_new_reports"
+        else:
+            reason = "existing_issue_no_new_reports"
     elif existing_issue is not None and existing_issue.last_slack_alert_sent:
         if issue.new_since_last_alert >= settings.existing_update_threshold:
             alert_type = "existing_issue_update"
@@ -62,6 +70,7 @@ def decide_alert(
         first_noticed=first_noticed,
         latest_report=latest_report,
         helpscout_links=links,
+        slack_action=_slack_action(issue, should_alert, reason),
     )
 
 
@@ -79,3 +88,15 @@ def _reports_after(patch_date: str, reports: list[SourceReport]) -> int:
     except ValueError:
         return 0
     return len([report for report in reports if report.date_submitted > parsed_patch_date])
+
+
+def _slack_action(issue: IssueRecord, should_alert: bool, reason: str) -> str:
+    if reason == "issue_status_resolved":
+        return "suppress_resolved"
+    if reason.startswith("issue_status_"):
+        return "suppress_status"
+    if not should_alert:
+        return "none"
+    if issue.slack_channel_id and issue.slack_message_ts:
+        return "update_existing"
+    return "post_new"

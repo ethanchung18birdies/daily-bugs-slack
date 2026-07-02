@@ -8,7 +8,7 @@ from typing import Iterable
 from models import IssueCluster, IssueRecord, SourceReport
 
 
-ISSUE_STATUSES = ("Monitoring", "Open", "Escalated", "Patched", "Closed", "Dismissed")
+ISSUE_STATUSES = ("Monitoring", "Acknowledged", "Open", "Escalated", "Patched", "Resolved", "Closed", "Dismissed")
 ISSUE_MEMORY_COLUMNS = (
     "issue_id",
     "status",
@@ -30,6 +30,14 @@ ISSUE_MEMORY_COLUMNS = (
     "created_at",
     "updated_at",
     "issue_signature",
+    "slack_channel_id",
+    "slack_message_ts",
+    "slack_message_url",
+    "last_slack_update_sent",
+    "acknowledged_at",
+    "acknowledged_by",
+    "resolved_at",
+    "resolved_by",
 )
 
 ALERT_LOG_COLUMNS = (
@@ -56,6 +64,19 @@ MATCHED_REPORTS_COLUMNS = (
     "confidence",
 )
 
+ISSUE_ACTIONS_LOG_COLUMNS = (
+    "action_id",
+    "issue_id",
+    "action",
+    "acted_at",
+    "actor_slack_id",
+    "actor_name",
+    "previous_status",
+    "new_status",
+    "slack_channel_id",
+    "slack_message_ts",
+)
+
 
 def issue_from_row(row: dict[str, str], row_number: int | None = None) -> IssueRecord:
     return IssueRecord(
@@ -79,6 +100,14 @@ def issue_from_row(row: dict[str, str], row_number: int | None = None) -> IssueR
         created_at=row.get("created_at", "").strip(),
         updated_at=row.get("updated_at", "").strip(),
         issue_signature=row.get("issue_signature", "").strip(),
+        slack_channel_id=row.get("slack_channel_id", "").strip(),
+        slack_message_ts=row.get("slack_message_ts", "").strip(),
+        slack_message_url=row.get("slack_message_url", "").strip(),
+        last_slack_update_sent=row.get("last_slack_update_sent", "").strip(),
+        acknowledged_at=row.get("acknowledged_at", "").strip(),
+        acknowledged_by=row.get("acknowledged_by", "").strip(),
+        resolved_at=row.get("resolved_at", "").strip(),
+        resolved_by=row.get("resolved_by", "").strip(),
         row_number=row_number,
     )
 
@@ -105,6 +134,14 @@ def issue_to_row(issue: IssueRecord) -> list[str | int]:
         issue.created_at,
         issue.updated_at,
         issue.issue_signature,
+        issue.slack_channel_id,
+        issue.slack_message_ts,
+        issue.slack_message_url,
+        issue.last_slack_update_sent,
+        issue.acknowledged_at,
+        issue.acknowledged_by,
+        issue.resolved_at,
+        issue.resolved_by,
     ]
 
 
@@ -120,12 +157,12 @@ def build_updated_issue(
     existing_links = _split_lines(existing.helpscout_links) if existing else []
     all_links = sorted(set(existing_links).union(links))
     platforms = format_platform_counts(Counter(report.platform for report in reports))
-    last_alert_date = _date_part(existing.last_slack_alert_sent) if existing else None
+    last_update_date = _date_part((existing.last_slack_update_sent or existing.last_slack_alert_sent) if existing else "")
     existing_first = _safe_parse_date(existing.first_noticed) if existing else None
     existing_latest = _safe_parse_date(existing.latest_report) if existing else None
 
     new_since_last_alert = (
-        len([report for report in reports if not last_alert_date or report.date_submitted > last_alert_date])
+        len([report for report in reports if not last_update_date or report.date_submitted > last_update_date])
         if existing
         else len(reports)
     )
@@ -154,6 +191,14 @@ def build_updated_issue(
         created_at=existing.created_at if existing and existing.created_at else now_iso,
         updated_at=now_iso,
         issue_signature=cluster.issue_signature,
+        slack_channel_id=existing.slack_channel_id if existing else "",
+        slack_message_ts=existing.slack_message_ts if existing else "",
+        slack_message_url=existing.slack_message_url if existing else "",
+        last_slack_update_sent=existing.last_slack_update_sent if existing else "",
+        acknowledged_at=existing.acknowledged_at if existing else "",
+        acknowledged_by=existing.acknowledged_by if existing else "",
+        resolved_at=existing.resolved_at if existing else "",
+        resolved_by=existing.resolved_by if existing else "",
         row_number=existing.row_number if existing else None,
     )
 
@@ -162,6 +207,28 @@ def mark_alert_sent(issue: IssueRecord, sent_at: str) -> IssueRecord:
     return IssueRecord(
         **{**issue.__dict__, "last_slack_alert_sent": sent_at, "updated_at": sent_at}
     )
+
+
+def mark_slack_message(
+    issue: IssueRecord,
+    *,
+    channel_id: str,
+    message_ts: str,
+    message_url: str,
+    sent_at: str,
+    is_new_alert: bool,
+) -> IssueRecord:
+    values = {
+        **issue.__dict__,
+        "slack_channel_id": channel_id,
+        "slack_message_ts": message_ts,
+        "slack_message_url": message_url,
+        "last_slack_update_sent": sent_at,
+        "updated_at": sent_at,
+    }
+    if is_new_alert:
+        values["last_slack_alert_sent"] = sent_at
+    return IssueRecord(**values)
 
 
 def format_platform_counts(counts: Counter[str]) -> str:
@@ -177,7 +244,7 @@ def make_issue_id(signature: str, first_noticed: date) -> str:
 
 
 def find_existing_issue(cluster: IssueCluster, issues: Iterable[IssueRecord]) -> IssueRecord | None:
-    active = [issue for issue in issues if issue.status not in {"Closed", "Dismissed"}]
+    active = list(issues)
     if cluster.issue_id:
         for issue in active:
             if issue.issue_id == cluster.issue_id:

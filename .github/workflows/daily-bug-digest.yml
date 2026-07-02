@@ -86,6 +86,8 @@ jobs:
           ISSUE_MEMORY_SPREADSHEET_ID: ${{ secrets.ISSUE_MEMORY_SPREADSHEET_ID || '1pVU4K4E1TDdosF3XiPFxKhM8RYDS7iNOQWucNqQK7OQ' }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ github.workspace }}/service-account.json
           PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL: ${{ secrets.PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-mini' }}
           ROLLING_WINDOW_DAYS: ${{ vars.ROLLING_WINDOW_DAYS || '7' }}

@@ -9,6 +9,7 @@ from googleapiclient.errors import HttpError
 from config import Settings
 from issue_memory import (
     ALERT_LOG_COLUMNS,
+    ISSUE_ACTIONS_LOG_COLUMNS,
     ISSUE_MEMORY_COLUMNS,
     MATCHED_REPORTS_COLUMNS,
     issue_from_row,
@@ -21,6 +22,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 ISSUE_MEMORY_TAB = "Issue Memory"
 ALERT_LOG_TAB = "Alert Log"
 MATCHED_REPORTS_TAB = "Matched Reports Log"
+ISSUE_ACTIONS_LOG_TAB = "Issue Actions Log"
 
 
 class SheetsClient:
@@ -40,10 +42,11 @@ class SheetsClient:
         self._ensure_tab(self.memory_spreadsheet_id, ISSUE_MEMORY_TAB, ISSUE_MEMORY_COLUMNS)
         self._ensure_tab(self.memory_spreadsheet_id, ALERT_LOG_TAB, ALERT_LOG_COLUMNS)
         self._ensure_tab(self.memory_spreadsheet_id, MATCHED_REPORTS_TAB, MATCHED_REPORTS_COLUMNS)
+        self._ensure_tab(self.memory_spreadsheet_id, ISSUE_ACTIONS_LOG_TAB, ISSUE_ACTIONS_LOG_COLUMNS)
 
     def read_issues(self) -> list[IssueRecord]:
         try:
-            values = self._get_values(self.memory_spreadsheet_id, f"'{ISSUE_MEMORY_TAB}'!A:Z")
+            values = self._get_values(self.memory_spreadsheet_id, f"'{ISSUE_MEMORY_TAB}'!A:AZ")
         except HttpError as exc:
             if exc.resp.status == 400:
                 return []
@@ -60,14 +63,15 @@ class SheetsClient:
 
     def upsert_issue(self, issue: IssueRecord) -> None:
         values = [issue_to_row(issue)]
+        end_column = _column_name(len(ISSUE_MEMORY_COLUMNS))
         if issue.row_number:
             self._update_values(
                 self.memory_spreadsheet_id,
-                f"'{ISSUE_MEMORY_TAB}'!A{issue.row_number}:T{issue.row_number}",
+                f"'{ISSUE_MEMORY_TAB}'!A{issue.row_number}:{end_column}{issue.row_number}",
                 values,
             )
         else:
-            self._append_values(self.memory_spreadsheet_id, f"'{ISSUE_MEMORY_TAB}'!A:T", values)
+            self._append_values(self.memory_spreadsheet_id, f"'{ISSUE_MEMORY_TAB}'!A:{end_column}", values)
 
     def append_alert_log(self, row: list[str | int | float]) -> None:
         self._append_values(self.memory_spreadsheet_id, f"'{ALERT_LOG_TAB}'!A:I", [row])
@@ -75,6 +79,9 @@ class SheetsClient:
     def append_matched_report_logs(self, rows: list[list[str | int | float]]) -> None:
         if rows:
             self._append_values(self.memory_spreadsheet_id, f"'{MATCHED_REPORTS_TAB}'!A:I", rows)
+
+    def append_issue_action_log(self, row: list[str | int | float]) -> None:
+        self._append_values(self.memory_spreadsheet_id, f"'{ISSUE_ACTIONS_LOG_TAB}'!A:J", [row])
 
     def _get_values(self, spreadsheet_id: str, range_name: str) -> list[list[str]]:
         response = (
@@ -106,8 +113,14 @@ class SheetsClient:
         sheet_id = self._ensure_sheet_exists(spreadsheet_id, tab_name)
         values = self._get_values(spreadsheet_id, f"'{tab_name}'!1:1")
         current_headers = values[0] if values else []
-        if current_headers != list(headers):
-            self._update_values(spreadsheet_id, f"'{tab_name}'!A1:Z1", [list(headers)])
+        if not current_headers:
+            self._update_values(spreadsheet_id, f"'{tab_name}'!A1:{_column_name(len(headers))}1", [list(headers)])
+        else:
+            missing_headers = [header for header in headers if header not in current_headers]
+            if missing_headers:
+                start_column = _column_name(len(current_headers) + 1)
+                end_column = _column_name(len(current_headers) + len(missing_headers))
+                self._update_values(spreadsheet_id, f"'{tab_name}'!{start_column}1:{end_column}1", [missing_headers])
 
         self.service.spreadsheets().batchUpdate(
             spreadsheetId=spreadsheet_id,
@@ -155,3 +168,13 @@ class SheetsClient:
 def _record_from_row(headers: list[str], row: list[str]) -> dict[str, str]:
     padded = row + [""] * (len(headers) - len(row))
     return {header: padded[index] for index, header in enumerate(headers)}
+
+
+def _column_name(index: int) -> str:
+    if index < 1:
+        raise ValueError("index must be positive")
+    letters = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        letters = chr(ord("A") + remainder) + letters
+    return letters

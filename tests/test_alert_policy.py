@@ -15,6 +15,8 @@ def settings() -> Settings:
         issue_memory_spreadsheet_id="memory",
         google_service_account_json=Path("/tmp/key.json"),
         slack_webhook_url="",
+        slack_bot_token="xoxb-token",
+        slack_channel_id="C123",
         openai_api_key="key",
         openai_model="model",
         rolling_window_days=7,
@@ -78,6 +80,7 @@ class AlertPolicyTests(unittest.TestCase):
 
         self.assertTrue(decision.should_alert)
         self.assertEqual(decision.alert_type, "new_issue")
+        self.assertEqual(decision.slack_action, "post_new")
 
     def test_high_impact_threshold(self) -> None:
         decision = decide_alert(
@@ -96,6 +99,17 @@ class AlertPolicyTests(unittest.TestCase):
         self.assertTrue(decision.should_alert)
         self.assertEqual(decision.alert_type, "existing_issue_update")
 
+    def test_existing_issue_with_slack_message_updates_on_new_reports(self) -> None:
+        existing = issue(
+            last_slack_alert_sent="2026-06-01T15:00:00+00:00",
+            slack_channel_id="C123",
+            slack_message_ts="123.456",
+        )
+        decision = decide_alert(issue=issue(slack_channel_id="C123", slack_message_ts="123.456"), reports=reports(3), existing_issue=existing, settings=settings())
+
+        self.assertTrue(decision.should_alert)
+        self.assertEqual(decision.slack_action, "update_existing")
+
     def test_patched_threshold(self) -> None:
         decision = decide_alert(
             issue=issue(status="Patched", patch_date="2026-06-01"),
@@ -111,6 +125,12 @@ class AlertPolicyTests(unittest.TestCase):
         decision = decide_alert(issue=issue(status="Dismissed"), reports=reports(5), existing_issue=None, settings=settings())
 
         self.assertFalse(decision.should_alert)
+
+    def test_resolved_suppresses(self) -> None:
+        decision = decide_alert(issue=issue(status="Resolved"), reports=reports(5), existing_issue=issue(status="Resolved"), settings=settings())
+
+        self.assertFalse(decision.should_alert)
+        self.assertEqual(decision.slack_action, "suppress_resolved")
 
 
 if __name__ == "__main__":

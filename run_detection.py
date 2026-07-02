@@ -10,10 +10,10 @@ import uuid
 from alert_policy import decide_alert
 from config import PT, load_settings
 from issue_matching import match_issues
-from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent
+from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent, mark_slack_message
 from report_parser import month_tabs_for_window, parse_source_rows, previous_report_date, rolling_window
 from sheets_client import SheetsClient
-from slack_alerts import format_issue_alert, send_slack_message
+from slack_alerts import format_issue_alert, post_issue_alert, send_slack_message, update_issue_alert
 
 
 LOGGER = logging.getLogger("run_detection")
@@ -67,22 +67,57 @@ def run(argv: list[str] | None = None) -> int:
             existing_issue=existing,
             settings=settings,
         )
+        slack_result = None
         if decision.should_alert and not args.dry_run:
-            message = format_issue_alert(decision)
-            slack_ts = send_slack_message(settings.slack_webhook_url, message)
-            updated_issue = mark_alert_sent(updated_issue, now_iso)
+            if settings.slack_bot_token and settings.slack_channel_id:
+                if decision.slack_action == "update_existing":
+                    channel_id = updated_issue.slack_channel_id or settings.slack_channel_id
+                    slack_result = update_issue_alert(
+                        settings.slack_bot_token,
+                        channel_id,
+                        updated_issue.slack_message_ts,
+                        updated_issue,
+                        decision,
+                    )
+                    updated_issue = mark_slack_message(
+                        updated_issue,
+                        channel_id=slack_result.channel_id,
+                        message_ts=slack_result.message_ts,
+                        message_url=slack_result.message_url,
+                        sent_at=now_iso,
+                        is_new_alert=False,
+                    )
+                else:
+                    slack_result = post_issue_alert(
+                        settings.slack_bot_token,
+                        settings.slack_channel_id,
+                        updated_issue,
+                        decision,
+                    )
+                    updated_issue = mark_slack_message(
+                        updated_issue,
+                        channel_id=slack_result.channel_id,
+                        message_ts=slack_result.message_ts,
+                        message_url=slack_result.message_url,
+                        sent_at=now_iso,
+                        is_new_alert=True,
+                    )
+            else:
+                message = format_issue_alert(decision)
+                send_slack_message(settings.slack_webhook_url, message)
+                updated_issue = mark_alert_sent(updated_issue, now_iso)
             sheets.upsert_issue(updated_issue)
             sheets.append_alert_log(
                 [
                     f"alert-{uuid.uuid4().hex[:12]}",
                     updated_issue.issue_id,
-                    decision.alert_type,
+                    "updated_existing_message" if decision.slack_action == "update_existing" else decision.alert_type,
                     now_iso,
                     decision.rolling_window_count,
                     decision.new_since_last_alert,
-                    "",
-                    slack_ts,
-                    decision.reason,
+                    slack_result.channel_id if slack_result else "",
+                    slack_result.message_ts if slack_result else "",
+                    f"{decision.reason}; slack_action={decision.slack_action}",
                 ]
             )
         elif not args.dry_run:
@@ -97,7 +132,7 @@ def run(argv: list[str] | None = None) -> int:
                     decision.new_since_last_alert,
                     "",
                     "",
-                    decision.reason,
+                    f"{decision.reason}; slack_action={decision.slack_action}",
                 ]
             )
 
@@ -126,6 +161,7 @@ def run(argv: list[str] | None = None) -> int:
                 "alert_type": decision.alert_type,
                 "should_alert": decision.should_alert,
                 "reason": decision.reason,
+                "slack_action": decision.slack_action,
                 "rolling_window_count": decision.rolling_window_count,
                 "new_since_last_alert": decision.new_since_last_alert,
                 "links": list(decision.helpscout_links),

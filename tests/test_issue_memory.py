@@ -32,6 +32,9 @@ class IssueMemoryTests(unittest.TestCase):
             "new_since_last_alert": "2",
             "total_report_count": "5",
             "issue_signature": "finish_round_save_stuck",
+            "slack_channel_id": "C123",
+            "slack_message_ts": "123.456",
+            "acknowledged_by": "Ethan",
         }
 
         issue = issue_from_row(row, row_number=7)
@@ -39,7 +42,11 @@ class IssueMemoryTests(unittest.TestCase):
         self.assertEqual(issue.row_number, 7)
         self.assertEqual(issue.status, "Open")
         self.assertEqual(issue.rolling_window_count, 3)
+        self.assertEqual(issue.slack_channel_id, "C123")
+        self.assertEqual(issue.slack_message_ts, "123.456")
+        self.assertEqual(issue.acknowledged_by, "Ethan")
         self.assertEqual(issue_to_row(issue)[0], "ISSUE-1")
+        self.assertEqual(len(issue_to_row(issue)), 28)
 
     def test_build_updated_issue_creates_new_issue(self) -> None:
         cluster = IssueCluster(
@@ -67,14 +74,14 @@ class IssueMemoryTests(unittest.TestCase):
         self.assertIn("Android: 1", issue.platforms)
         self.assertIn("iOS: 1", issue.platforms)
 
-    def test_find_existing_issue_ignores_closed_and_dismissed(self) -> None:
+    def test_find_existing_issue_can_match_suppressed_statuses(self) -> None:
         cluster = IssueCluster("ISSUE-1", "Summary", "Area", "sig", (0,), "existing", 0.9)
         issues = [
             IssueRecord("ISSUE-1", "Closed", "", "", "", "", "", 0, 0, 0, "", "", "", "", "", "", "", "", "", "sig"),
             IssueRecord("ISSUE-2", "Open", "", "", "", "", "", 0, 0, 0, "", "", "", "", "", "", "", "", "", "sig"),
         ]
 
-        self.assertEqual(find_existing_issue(cluster, issues).issue_id, "ISSUE-2")
+        self.assertEqual(find_existing_issue(cluster, issues).issue_id, "ISSUE-1")
 
 
 if __name__ == "__main__":

@@ -55,7 +55,6 @@ def _openai_match_issues(
                 "issue_signature": issue.issue_signature,
             }
             for issue in existing_issues
-            if issue.status not in {"Closed", "Dismissed"}
         ],
     }
     response = client.chat.completions.create(
@@ -95,7 +94,7 @@ def heuristic_match_issues(reports: list[SourceReport], existing_issues: list[Is
     clusters: list[IssueCluster] = []
     for signature, indices in groups.items():
         matching_issue = next(
-            (issue for issue in existing_issues if issue.issue_signature == signature and issue.status not in {"Closed", "Dismissed"}),
+            (issue for issue in existing_issues if issue.issue_signature == signature),
             None,
         )
         summary = summarize_cluster([reports[index] for index in indices])

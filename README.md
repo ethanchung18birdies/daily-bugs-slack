@@ -30,6 +30,8 @@ Fill in `.env` for local dry-runs:
 - `ISSUE_MEMORY_SPREADSHEET_ID`
 - `GOOGLE_SERVICE_ACCOUNT_JSON`
 - `PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL`
+- `SLACK_BOT_TOKEN`
+- `SLACK_CHANNEL_ID`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - threshold vars, if overriding defaults
@@ -49,11 +51,26 @@ The script creates or updates these tabs:
 Supported issue statuses:
 
 - `Monitoring`
+- `Acknowledged`
 - `Open`
 - `Escalated`
 - `Patched`
+- `Resolved`
 - `Closed`
 - `Dismissed`
+
+Interactive Slack alerts store message state in these Issue Memory columns:
+
+- `slack_channel_id`
+- `slack_message_ts`
+- `slack_message_url`
+- `last_slack_update_sent`
+- `acknowledged_at`
+- `acknowledged_by`
+- `resolved_at`
+- `resolved_by`
+
+Button clicks are recorded in the `Issue Actions Log` tab.
 
 ## Run Locally
 
@@ -91,6 +108,8 @@ Add repository secrets:
 
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: full JSON key contents.
 - `PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL`: Slack incoming webhook URL.
+- `SLACK_BOT_TOKEN`: Slack bot token with `chat:write`.
+- `SLACK_CHANNEL_ID`: Slack channel ID for recurring bug alerts.
 - `OPENAI_API_KEY`: OpenAI API key.
 
 Optional repository variables:
@@ -105,6 +124,27 @@ Optional repository variables:
 - `HIGH_IMPACT_TERMS`
 
 Manual workflow runs default to dry-run mode. Set `dry_run=false` only when you want to post Slack alerts and write Issue Memory changes.
+
+## Slack Interactivity
+
+Incoming webhooks cannot update prior messages, so interactive alerts use the Slack Web API when `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are configured.
+
+To enable buttons:
+
+1. Create or update a Slack app with bot scope `chat:write`.
+2. Invite the bot to the dedicated alert channel.
+3. Deploy `slack_interactions_apps_script.js` as a Google Apps Script web app.
+4. Set Apps Script properties:
+   - `ISSUE_MEMORY_SPREADSHEET_ID`
+   - `SLACK_BOT_TOKEN`
+   - `SLACK_INTERACTION_SECRET`
+   - optional `SLACK_ALLOWED_TEAM_ID`
+   - optional `SLACK_ALLOWED_API_APP_ID`
+5. In Slack app settings, enable Interactivity and set the Request URL to:
+
+```text
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?secret=YOUR_SLACK_INTERACTION_SECRET
+```
 
 ## Tests
 

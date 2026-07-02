@@ -37,6 +37,8 @@ class Settings:
     issue_memory_spreadsheet_id: str
     google_service_account_json: Path
     slack_webhook_url: str
+    slack_bot_token: str
+    slack_channel_id: str
     openai_api_key: str
     openai_model: str
     rolling_window_days: int
@@ -55,6 +57,14 @@ def load_settings(dotenv_path: str | None = None, *, require_slack: bool = True)
         for term in os.getenv("HIGH_IMPACT_TERMS", "").split(",")
         if term.strip()
     ) or DEFAULT_HIGH_IMPACT_TERMS
+    slack_webhook_url = os.getenv("PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL", "")
+    slack_bot_token = os.getenv("SLACK_BOT_TOKEN", "")
+    slack_channel_id = os.getenv("SLACK_CHANNEL_ID", "")
+    if require_slack and not slack_webhook_url and not (slack_bot_token and slack_channel_id):
+        raise ValueError(
+            "Missing Slack configuration: set SLACK_BOT_TOKEN and SLACK_CHANNEL_ID, "
+            "or set PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL for legacy webhook fallback"
+        )
 
     return Settings(
         product_feedback_spreadsheet_id=os.getenv(
@@ -62,11 +72,9 @@ def load_settings(dotenv_path: str | None = None, *, require_slack: bool = True)
         ),
         issue_memory_spreadsheet_id=_required_env("ISSUE_MEMORY_SPREADSHEET_ID"),
         google_service_account_json=Path(_required_env("GOOGLE_SERVICE_ACCOUNT_JSON")).expanduser(),
-        slack_webhook_url=(
-            _required_env("PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL")
-            if require_slack
-            else os.getenv("PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL", "")
-        ),
+        slack_webhook_url=slack_webhook_url,
+        slack_bot_token=slack_bot_token,
+        slack_channel_id=slack_channel_id,
         openai_api_key=_required_env("OPENAI_API_KEY"),
         openai_model=os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL),
         rolling_window_days=_int_env("ROLLING_WINDOW_DAYS", 7),

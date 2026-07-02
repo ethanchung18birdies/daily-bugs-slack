@@ -52,6 +52,14 @@ class IssueRecord:
     created_at: str
     updated_at: str
     issue_signature: str
+    slack_channel_id: str = ""
+    slack_message_ts: str = ""
+    slack_message_url: str = ""
+    last_slack_update_sent: str = ""
+    acknowledged_at: str = ""
+    acknowledged_by: str = ""
+    resolved_at: str = ""
+    resolved_by: str = ""
     row_number: int | None = None
 
 
@@ -80,3 +88,4 @@ class AlertDecision:
     first_noticed: date
     latest_report: date
     helpscout_links: tuple[str, ...]
+    slack_action: str = "none"
