@@ -5,7 +5,7 @@ import unittest
 
 from models import AlertDecision, IssueRecord
 import slack_alerts
-from slack_alerts import build_issue_alert_payload, format_issue_alert, get_message_reactions
+from slack_alerts import build_issue_alert_payload, delete_issue_alert, format_issue_alert, get_message_reactions
 
 
 def issue(**overrides) -> IssueRecord:
@@ -88,7 +88,13 @@ class SlackAlertsTests(unittest.TestCase):
             if block["type"] == "context"
             for element in block["elements"]
         ]
-        self.assertEqual(context_texts, ["React with :eyes: to acknowledge or :white_check_mark: to resolve."])
+        self.assertEqual(
+            context_texts,
+            [
+                "React with :eyes: to acknowledge, :white_check_mark: to resolve, "
+                "or :wastebasket: to delete this Slack alert."
+            ],
+        )
 
     def test_resolved_payload_removes_reaction_instructions(self) -> None:
         decision = AlertDecision(
@@ -120,6 +126,7 @@ class SlackAlertsTests(unittest.TestCase):
                     "reactions": [
                         {"name": "eyes", "users": ["U1"], "count": 1},
                         {"name": "white_check_mark", "users": ["U2", "U3"], "count": 2},
+                        {"name": "wastebasket", "users": ["U4"], "count": 1},
                     ]
                 },
             }
@@ -128,8 +135,20 @@ class SlackAlertsTests(unittest.TestCase):
         finally:
             slack_alerts._slack_api_get = original
 
-        self.assertEqual([reaction.name for reaction in reactions], ["eyes", "white_check_mark"])
+        self.assertEqual([reaction.name for reaction in reactions], ["eyes", "white_check_mark", "wastebasket"])
         self.assertEqual(reactions[1].users, ("U2", "U3"))
+
+    def test_delete_issue_alert_calls_chat_delete(self) -> None:
+        calls = []
+        original = slack_alerts._slack_api_call
+        try:
+            slack_alerts._slack_api_call = lambda token, method, payload: calls.append((token, method, payload)) or {"ok": True}
+
+            delete_issue_alert("token", "C123", "123.456")
+        finally:
+            slack_alerts._slack_api_call = original
+
+        self.assertEqual(calls, [("token", "chat.delete", {"channel": "C123", "ts": "123.456"})])
 
 
 if __name__ == "__main__":

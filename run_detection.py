@@ -14,7 +14,7 @@ from issue_matching import match_issues
 from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent, mark_slack_message
 from report_parser import month_tabs_for_window, parse_source_rows, previous_report_date, rolling_window
 from sheets_client import SheetsClient
-from slack_alerts import format_issue_alert, get_message_reactions, post_issue_alert, send_slack_message, update_issue_alert
+from slack_alerts import delete_issue_alert, format_issue_alert, get_message_reactions, post_issue_alert, send_slack_message, update_issue_alert
 
 
 LOGGER = logging.getLogger("run_detection")
@@ -195,8 +195,6 @@ def run(argv: list[str] | None = None) -> int:
 def sync_issue_status_from_reactions(issue, settings, now_iso: str):
     if not issue or not settings.slack_bot_token or not issue.slack_channel_id or not issue.slack_message_ts:
         return issue
-    if issue.status == "Resolved":
-        return issue
     try:
         reactions = get_message_reactions(settings.slack_bot_token, issue.slack_channel_id, issue.slack_message_ts)
     except Exception as exc:
@@ -205,9 +203,16 @@ def sync_issue_status_from_reactions(issue, settings, now_iso: str):
     action_result = apply_reaction_status(issue, reactions=reactions, acted_at=now_iso)
     if not action_result:
         return issue
+    if action_result.action == "delete_slack_message":
+        try:
+            delete_issue_alert(settings.slack_bot_token, issue.slack_channel_id, issue.slack_message_ts)
+        except Exception as exc:
+            LOGGER.warning("Could not delete Slack alert for %s: %s", issue.issue_id, exc)
+            return issue
     LOGGER.info(
-        "Synced issue %s status from Slack reaction: %s -> %s",
+        "Synced issue %s from Slack reaction action %s: %s -> %s",
         issue.issue_id,
+        action_result.action,
         action_result.previous_status,
         action_result.new_status,
     )

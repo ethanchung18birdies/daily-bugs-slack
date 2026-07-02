@@ -60,6 +60,8 @@ class IssueRecord:
     acknowledged_by: str = ""
     resolved_at: str = ""
     resolved_by: str = ""
+    slack_message_deleted_at: str = ""
+    slack_message_deleted_by: str = ""
     row_number: int | None = None
 
 

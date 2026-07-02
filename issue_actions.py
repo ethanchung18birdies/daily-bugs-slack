@@ -46,6 +46,22 @@ def apply_issue_action(
                 "close_date": acted_at.split("T", 1)[0],
             },
         )
+    if action == "delete_slack_message":
+        return _replace_issue(
+            issue,
+            action=action,
+            actor=actor,
+            acted_at=acted_at,
+            values={
+                "slack_channel_id": "",
+                "slack_message_ts": "",
+                "slack_message_url": "",
+                "last_slack_update_sent": acted_at,
+                "slack_message_deleted_at": acted_at,
+                "slack_message_deleted_by": actor,
+                "updated_at": acted_at,
+            },
+        )
     raise ValueError(f"Unsupported issue action: {action}")
 
 
@@ -56,6 +72,13 @@ def apply_reaction_status(
     acted_at: str,
 ) -> IssueActionResult | None:
     reaction_users = {reaction.name: reaction.users for reaction in reactions}
+    if reaction_users.get("wastebasket") and issue.slack_message_ts:
+        return apply_issue_action(
+            issue,
+            action="delete_slack_message",
+            actor=_format_reaction_actor(reaction_users["wastebasket"]),
+            acted_at=acted_at,
+        )
     if reaction_users.get("white_check_mark") and issue.status != "Resolved":
         return apply_issue_action(
             issue,

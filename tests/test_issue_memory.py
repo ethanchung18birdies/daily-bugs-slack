@@ -46,7 +46,7 @@ class IssueMemoryTests(unittest.TestCase):
         self.assertEqual(issue.slack_message_ts, "123.456")
         self.assertEqual(issue.acknowledged_by, "Ethan")
         self.assertEqual(issue_to_row(issue)[0], "ISSUE-1")
-        self.assertEqual(len(issue_to_row(issue)), 28)
+        self.assertEqual(len(issue_to_row(issue)), 30)
 
     def test_build_updated_issue_creates_new_issue(self) -> None:
         cluster = IssueCluster(

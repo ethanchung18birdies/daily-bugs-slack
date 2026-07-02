@@ -38,6 +38,8 @@ ISSUE_MEMORY_COLUMNS = (
     "acknowledged_by",
     "resolved_at",
     "resolved_by",
+    "slack_message_deleted_at",
+    "slack_message_deleted_by",
 )
 
 ALERT_LOG_COLUMNS = (
@@ -94,6 +96,8 @@ def issue_from_row(row: dict[str, str], row_number: int | None = None) -> IssueR
         acknowledged_by=row.get("acknowledged_by", "").strip(),
         resolved_at=row.get("resolved_at", "").strip(),
         resolved_by=row.get("resolved_by", "").strip(),
+        slack_message_deleted_at=row.get("slack_message_deleted_at", "").strip(),
+        slack_message_deleted_by=row.get("slack_message_deleted_by", "").strip(),
         row_number=row_number,
     )
 
@@ -128,6 +132,8 @@ def issue_to_row(issue: IssueRecord) -> list[str | int]:
         issue.acknowledged_by,
         issue.resolved_at,
         issue.resolved_by,
+        issue.slack_message_deleted_at,
+        issue.slack_message_deleted_by,
     ]
 
 
@@ -185,6 +191,8 @@ def build_updated_issue(
         acknowledged_by=existing.acknowledged_by if existing else "",
         resolved_at=existing.resolved_at if existing else "",
         resolved_by=existing.resolved_by if existing else "",
+        slack_message_deleted_at=existing.slack_message_deleted_at if existing else "",
+        slack_message_deleted_by=existing.slack_message_deleted_by if existing else "",
         row_number=existing.row_number if existing else None,
     )
 

@@ -86,6 +86,22 @@ class IssueActionsTests(unittest.TestCase):
         self.assertEqual(result.issue.status, "Resolved")
         self.assertEqual(result.issue.resolved_by, "U456")
 
+    def test_wastebasket_reaction_clears_slack_message_without_resolving(self) -> None:
+        result = apply_reaction_status(
+            issue(slack_channel_id="C123", slack_message_ts="123.456", slack_message_url="https://slack/message"),
+            reactions=(SlackReaction("wastebasket", ("U789",), 1),),
+            acted_at="2026-07-02T15:00:00+00:00",
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.action, "delete_slack_message")
+        self.assertEqual(result.issue.status, "Monitoring")
+        self.assertEqual(result.issue.slack_channel_id, "")
+        self.assertEqual(result.issue.slack_message_ts, "")
+        self.assertEqual(result.issue.slack_message_url, "")
+        self.assertEqual(result.issue.slack_message_deleted_by, "U789")
+        self.assertEqual(result.issue.slack_message_deleted_at, "2026-07-02T15:00:00+00:00")
+
     def test_eyes_reaction_does_not_downgrade_acknowledged_issue(self) -> None:
         result = apply_reaction_status(
             issue(status="Acknowledged"),

@@ -110,7 +110,10 @@ def build_issue_alert_payload(issue: IssueRecord, decision: AlertDecision) -> di
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "React with :eyes: to acknowledge or :white_check_mark: to resolve.",
+                        "text": (
+                            "React with :eyes: to acknowledge, :white_check_mark: to resolve, "
+                            "or :wastebasket: to delete this Slack alert."
+                        ),
                     }
                 ],
             }
@@ -148,6 +151,10 @@ def update_issue_alert(bot_token: str, channel_id: str, message_ts: str, issue: 
         message_ts=response_ts,
         message_url=get_message_permalink(bot_token, response_channel, response_ts),
     )
+
+
+def delete_issue_alert(bot_token: str, channel_id: str, message_ts: str) -> None:
+    _slack_api_call(bot_token, "chat.delete", {"channel": channel_id, "ts": message_ts})
 
 
 def get_message_permalink(bot_token: str, channel_id: str, message_ts: str) -> str:

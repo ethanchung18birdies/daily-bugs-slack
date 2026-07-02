@@ -69,6 +69,8 @@ Interactive Slack alerts store message state in these Issue Memory columns:
 - `acknowledged_by`
 - `resolved_at`
 - `resolved_by`
+- `slack_message_deleted_at`
+- `slack_message_deleted_by`
 
 ## Run Locally
 
@@ -137,8 +139,9 @@ When an alert appears in Slack:
 
 - React with `:eyes:` to mark the issue `Acknowledged`.
 - React with `:white_check_mark:` to mark the issue `Resolved`.
+- React with `:wastebasket:` to delete the Slack alert message without marking the issue resolved.
 
-The next scheduled or manual GitHub Actions run reads reactions from each tracked Slack alert message, updates Issue Memory, and edits the same Slack parent message. `Resolved` issues continue to be matched and logged, but they stop producing Slack updates.
+The next scheduled or manual GitHub Actions run reads reactions from each tracked Slack alert message, updates Issue Memory, and edits or deletes the same Slack parent message. `Resolved` issues continue to be matched and logged, but they stop producing Slack updates.
 
 ## Tests
 
