@@ -75,13 +75,17 @@ Run live:
 .venv/bin/python run_detection.py
 ```
 
-The legacy daily digest command still exists temporarily:
+The legacy daily digest command still exists temporarily for manual troubleshooting only. It is not used by production scheduling:
 
 ```bash
 .venv/bin/python daily_bug_digest.py --dry-run
 ```
 
+Do not schedule this project with local cron. GitHub Actions is the production scheduler so alerts continue to run when your laptop is off.
+
 ## GitHub Actions
+
+Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow runs daily at 8 AM Los Angeles time and can also be triggered manually.
 
 Add repository secrets:
 
