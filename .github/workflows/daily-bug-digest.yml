@@ -1,4 +1,4 @@
-name: Daily CS Product Bug Digest
+name: Recurring Bug Detection
 
 on:
   schedule:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       run_date:
-        description: "Optional pretend run date in YYYY-MM-DD format. Example: 2026-05-29 reports May 28."
+        description: "Optional pretend run date in YYYY-MM-DD format. Example: 2026-07-01 analyzes the 7 days ending June 30."
         required: false
         default: ""
         type: string
@@ -75,13 +75,22 @@ jobs:
           Path("service-account.json").write_text(key_json, encoding="utf-8")
           PY
 
-      - name: Send daily digest
+      - name: Detect recurring issues
         if: steps.schedule_guard.outputs.should_run == 'true'
         shell: bash
         env:
           PRODUCT_FEEDBACK_SPREADSHEET_ID: 19JPqsVsE0hU-oBF5G02HdctrQBgTBudzQvFFyQHaj28
+          ISSUE_MEMORY_SPREADSHEET_ID: ${{ secrets.ISSUE_MEMORY_SPREADSHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ github.workspace }}/service-account.json
           PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL: ${{ secrets.PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5-mini' }}
+          ROLLING_WINDOW_DAYS: ${{ vars.ROLLING_WINDOW_DAYS || '7' }}
+          NEW_ISSUE_THRESHOLD: ${{ vars.NEW_ISSUE_THRESHOLD || '3' }}
+          HIGH_IMPACT_THRESHOLD: ${{ vars.HIGH_IMPACT_THRESHOLD || '2' }}
+          EXISTING_UPDATE_THRESHOLD: ${{ vars.EXISTING_UPDATE_THRESHOLD || '3' }}
+          PATCHED_ALERT_THRESHOLD: ${{ vars.PATCHED_ALERT_THRESHOLD || '2' }}
+          HIGH_IMPACT_TERMS: ${{ vars.HIGH_IMPACT_TERMS || '' }}
           LOG_LEVEL: INFO
           RUN_DATE: ${{ github.event.inputs.run_date || '' }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
@@ -101,8 +110,8 @@ jobs:
             args+=(--dry-run)
           fi
 
-          printf 'Running daily_bug_digest.py with args:'
+          printf 'Running run_detection.py with args:'
           printf ' %q' "${args[@]}"
           printf '\n'
 
-          python daily_bug_digest.py "${args[@]}"
+          python run_detection.py "${args[@]}"
