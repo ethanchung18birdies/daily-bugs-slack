@@ -2,11 +2,11 @@ name: Recurring Bug Detection
 
 on:
   schedule:
-    # GitHub cron is UTC-only. These two runs cover 8 AM Los Angeles time
+    # GitHub cron is UTC-only. These two runs cover 8 PM Los Angeles time
     # during daylight saving time and standard time; the guard below skips
-    # whichever run is not 8 AM PT.
-    - cron: "0 15 * * *"
-    - cron: "0 16 * * *"
+    # whichever run is not 8 PM PT.
+    - cron: "0 3 * * *"
+    - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
       run_date:
@@ -55,7 +55,7 @@ jobs:
 
           event_name = os.environ["GITHUB_EVENT_NAME"]
           pt_now = datetime.now(ZoneInfo("America/Los_Angeles"))
-          should_run = event_name == "workflow_dispatch" or pt_now.hour == 8
+          should_run = event_name == "workflow_dispatch" or pt_now.hour == 20
 
           print(f"should_run={str(should_run).lower()}")
           print(f"pt_time={pt_now.isoformat()}")

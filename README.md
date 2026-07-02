@@ -6,7 +6,7 @@ This is no longer a daily digest of every bug. The system maintains Issue Memory
 
 ## Data Flow
 
-GitHub Actions runs daily at 8 AM Los Angeles time:
+GitHub Actions runs daily at 8 PM Los Angeles time:
 
 1. Read recent source reports from monthly tabs in the product feedback spreadsheet.
 2. Parse dates, feedback text, platform, device, app version, premium status, user id, tags, club/course metadata.
@@ -102,7 +102,7 @@ Do not schedule this project with local cron. GitHub Actions is the production s
 
 ## GitHub Actions
 
-Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow runs daily at 8 AM Los Angeles time and can also be triggered manually.
+Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow runs daily at 8 PM Los Angeles time and can also be triggered manually.
 
 Add repository secrets:
 
