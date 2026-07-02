@@ -70,8 +70,6 @@ Interactive Slack alerts store message state in these Issue Memory columns:
 - `resolved_at`
 - `resolved_by`
 
-Button clicks are recorded in the `Issue Actions Log` tab.
-
 ## Run Locally
 
 Dry-run without writing Sheets or posting Slack:
@@ -108,7 +106,7 @@ Add repository secrets:
 
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: full JSON key contents.
 - `PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL`: Slack incoming webhook URL.
-- `SLACK_BOT_TOKEN`: Slack bot token with `chat:write`.
+- `SLACK_BOT_TOKEN`: Slack bot token with `chat:write` and `reactions:read`.
 - `SLACK_CHANNEL_ID`: Slack channel ID for recurring bug alerts.
 - `OPENAI_API_KEY`: OpenAI API key.
 
@@ -125,26 +123,22 @@ Optional repository variables:
 
 Manual workflow runs default to dry-run mode. Set `dry_run=false` only when you want to post Slack alerts and write Issue Memory changes.
 
-## Slack Interactivity
+## Slack Reactions
 
-Incoming webhooks cannot update prior messages, so interactive alerts use the Slack Web API when `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are configured.
+Incoming webhooks cannot update prior messages or read reactions, so interactive alerts use the Slack Web API when `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are configured.
 
-To enable buttons:
+To enable lightweight status updates:
 
-1. Create or update a Slack app with bot scope `chat:write`.
+1. Create or update a Slack app with bot scopes `chat:write` and `reactions:read`.
 2. Invite the bot to the dedicated alert channel.
-3. Deploy `slack_interactions_apps_script.js` as a Google Apps Script web app.
-4. Set Apps Script properties:
-   - `ISSUE_MEMORY_SPREADSHEET_ID`
-   - `SLACK_BOT_TOKEN`
-   - `SLACK_INTERACTION_SECRET`
-   - optional `SLACK_ALLOWED_TEAM_ID`
-   - optional `SLACK_ALLOWED_API_APP_ID`
-5. In Slack app settings, enable Interactivity and set the Request URL to:
+3. Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` to GitHub repository secrets.
 
-```text
-https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?secret=YOUR_SLACK_INTERACTION_SECRET
-```
+When an alert appears in Slack:
+
+- React with `:eyes:` to mark the issue `Acknowledged`.
+- React with `:white_check_mark:` to mark the issue `Resolved`.
+
+The next scheduled or manual GitHub Actions run reads reactions from each tracked Slack alert message, updates Issue Memory, and edits the same Slack parent message. `Resolved` issues continue to be matched and logged, but they stop producing Slack updates.
 
 ## Tests
 

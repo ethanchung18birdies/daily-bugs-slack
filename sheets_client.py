@@ -9,7 +9,6 @@ from googleapiclient.errors import HttpError
 from config import Settings
 from issue_memory import (
     ALERT_LOG_COLUMNS,
-    ISSUE_ACTIONS_LOG_COLUMNS,
     ISSUE_MEMORY_COLUMNS,
     MATCHED_REPORTS_COLUMNS,
     issue_from_row,
@@ -22,7 +21,6 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 ISSUE_MEMORY_TAB = "Issue Memory"
 ALERT_LOG_TAB = "Alert Log"
 MATCHED_REPORTS_TAB = "Matched Reports Log"
-ISSUE_ACTIONS_LOG_TAB = "Issue Actions Log"
 
 
 class SheetsClient:
@@ -42,7 +40,6 @@ class SheetsClient:
         self._ensure_tab(self.memory_spreadsheet_id, ISSUE_MEMORY_TAB, ISSUE_MEMORY_COLUMNS)
         self._ensure_tab(self.memory_spreadsheet_id, ALERT_LOG_TAB, ALERT_LOG_COLUMNS)
         self._ensure_tab(self.memory_spreadsheet_id, MATCHED_REPORTS_TAB, MATCHED_REPORTS_COLUMNS)
-        self._ensure_tab(self.memory_spreadsheet_id, ISSUE_ACTIONS_LOG_TAB, ISSUE_ACTIONS_LOG_COLUMNS)
 
     def read_issues(self) -> list[IssueRecord]:
         try:
@@ -79,9 +76,6 @@ class SheetsClient:
     def append_matched_report_logs(self, rows: list[list[str | int | float]]) -> None:
         if rows:
             self._append_values(self.memory_spreadsheet_id, f"'{MATCHED_REPORTS_TAB}'!A:I", rows)
-
-    def append_issue_action_log(self, row: list[str | int | float]) -> None:
-        self._append_values(self.memory_spreadsheet_id, f"'{ISSUE_ACTIONS_LOG_TAB}'!A:J", [row])
 
     def _get_values(self, spreadsheet_id: str, range_name: str) -> list[list[str]]:
         response = (

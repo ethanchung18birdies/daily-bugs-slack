@@ -64,20 +64,6 @@ MATCHED_REPORTS_COLUMNS = (
     "confidence",
 )
 
-ISSUE_ACTIONS_LOG_COLUMNS = (
-    "action_id",
-    "issue_id",
-    "action",
-    "acted_at",
-    "actor_slack_id",
-    "actor_name",
-    "previous_status",
-    "new_status",
-    "slack_channel_id",
-    "slack_message_ts",
-)
-
-
 def issue_from_row(row: dict[str, str], row_number: int | None = None) -> IssueRecord:
     return IssueRecord(
         issue_id=row.get("issue_id", "").strip(),

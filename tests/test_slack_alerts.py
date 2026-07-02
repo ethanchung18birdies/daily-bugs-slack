@@ -4,7 +4,8 @@ from datetime import date
 import unittest
 
 from models import AlertDecision, IssueRecord
-from slack_alerts import build_issue_alert_payload, format_issue_alert
+import slack_alerts
+from slack_alerts import build_issue_alert_payload, format_issue_alert, get_message_reactions
 
 
 def issue(**overrides) -> IssueRecord:
@@ -61,7 +62,7 @@ class SlackAlertsTests(unittest.TestCase):
         self.assertNotIn("reasoning", message.casefold())
         self.assertNotIn("customer quote", message.casefold())
 
-    def test_build_issue_alert_payload_has_buttons(self) -> None:
+    def test_build_issue_alert_payload_has_reaction_instructions(self) -> None:
         decision = AlertDecision(
             issue_id="ISSUE-1",
             alert_type="new_issue",
@@ -81,15 +82,15 @@ class SlackAlertsTests(unittest.TestCase):
         payload = build_issue_alert_payload(issue(), decision)
 
         self.assertEqual(payload["text"], "Monitoring: Users cannot finish or save rounds. (7 reports)")
-        action_ids = [
-            element["action_id"]
+        context_texts = [
+            element["text"]
             for block in payload["blocks"]
-            if block["type"] == "actions"
+            if block["type"] == "context"
             for element in block["elements"]
         ]
-        self.assertEqual(action_ids, ["acknowledge_issue", "resolve_issue"])
+        self.assertEqual(context_texts, ["React with :eyes: to acknowledge or :white_check_mark: to resolve."])
 
-    def test_resolved_payload_removes_buttons(self) -> None:
+    def test_resolved_payload_removes_reaction_instructions(self) -> None:
         decision = AlertDecision(
             issue_id="ISSUE-1",
             alert_type="suppressed",
@@ -108,7 +109,27 @@ class SlackAlertsTests(unittest.TestCase):
 
         payload = build_issue_alert_payload(issue(status="Resolved"), decision)
 
-        self.assertFalse(any(block["type"] == "actions" for block in payload["blocks"]))
+        self.assertFalse(any(block["type"] == "context" for block in payload["blocks"]))
+
+    def test_get_message_reactions_parses_slack_response(self) -> None:
+        original = slack_alerts._slack_api_get
+        try:
+            slack_alerts._slack_api_get = lambda token, method, params: {
+                "ok": True,
+                "message": {
+                    "reactions": [
+                        {"name": "eyes", "users": ["U1"], "count": 1},
+                        {"name": "white_check_mark", "users": ["U2", "U3"], "count": 2},
+                    ]
+                },
+            }
+
+            reactions = get_message_reactions("token", "C123", "123.456")
+        finally:
+            slack_alerts._slack_api_get = original
+
+        self.assertEqual([reaction.name for reaction in reactions], ["eyes", "white_check_mark"])
+        self.assertEqual(reactions[1].users, ("U2", "U3"))
 
 
 if __name__ == "__main__":

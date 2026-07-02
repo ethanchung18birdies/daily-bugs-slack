@@ -9,11 +9,12 @@ import uuid
 
 from alert_policy import decide_alert
 from config import PT, load_settings
+from issue_actions import apply_reaction_status
 from issue_matching import match_issues
 from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent, mark_slack_message
 from report_parser import month_tabs_for_window, parse_source_rows, previous_report_date, rolling_window
 from sheets_client import SheetsClient
-from slack_alerts import format_issue_alert, post_issue_alert, send_slack_message, update_issue_alert
+from slack_alerts import format_issue_alert, get_message_reactions, post_issue_alert, send_slack_message, update_issue_alert
 
 
 LOGGER = logging.getLogger("run_detection")
@@ -60,11 +61,14 @@ def run(argv: list[str] | None = None) -> int:
         if not cluster_reports:
             continue
         existing = find_existing_issue(cluster, issues)
-        updated_issue = build_updated_issue(cluster, cluster_reports, existing, now_iso)
+        synced_existing = sync_issue_status_from_reactions(existing, settings, now_iso) if not args.dry_run else existing
+        if synced_existing and existing and synced_existing != existing and not args.dry_run:
+            sheets.upsert_issue(synced_existing)
+        updated_issue = build_updated_issue(cluster, cluster_reports, synced_existing, now_iso)
         decision = decide_alert(
             issue=updated_issue,
             reports=cluster_reports,
-            existing_issue=existing,
+            existing_issue=synced_existing,
             settings=settings,
         )
         slack_result = None
@@ -186,6 +190,28 @@ def run(argv: list[str] | None = None) -> int:
         LOGGER.info("Processed %s reports into %s clusters; sent %s alerts", len(reports), len(clusters), sent_count)
 
     return 0
+
+
+def sync_issue_status_from_reactions(issue, settings, now_iso: str):
+    if not issue or not settings.slack_bot_token or not issue.slack_channel_id or not issue.slack_message_ts:
+        return issue
+    if issue.status == "Resolved":
+        return issue
+    try:
+        reactions = get_message_reactions(settings.slack_bot_token, issue.slack_channel_id, issue.slack_message_ts)
+    except Exception as exc:
+        LOGGER.warning("Could not read Slack reactions for %s: %s", issue.issue_id, exc)
+        return issue
+    action_result = apply_reaction_status(issue, reactions=reactions, acted_at=now_iso)
+    if not action_result:
+        return issue
+    LOGGER.info(
+        "Synced issue %s status from Slack reaction: %s -> %s",
+        issue.issue_id,
+        action_result.previous_status,
+        action_result.new_status,
+    )
+    return action_result.issue
 
 
 def _parse_run_date(value: str) -> datetime:

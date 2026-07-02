@@ -14,6 +14,13 @@ class SlackMessageResult:
     message_url: str
 
 
+@dataclass(frozen=True)
+class SlackReaction:
+    name: str
+    users: tuple[str, ...]
+    count: int
+
+
 def format_issue_alert(decision: AlertDecision) -> str:
     lines = [
         ":rotating_light: *Possible Recurring Bug Detected*",
@@ -99,22 +106,12 @@ def build_issue_alert_payload(issue: IssueRecord, decision: AlertDecision) -> di
     if issue.status != "Resolved":
         blocks.append(
             {
-                "type": "actions",
-                "block_id": f"issue_actions__{issue.issue_id}",
+                "type": "context",
                 "elements": [
                     {
-                        "type": "button",
-                        "action_id": "acknowledge_issue",
-                        "text": {"type": "plain_text", "text": "Acknowledge", "emoji": True},
-                        "value": issue.issue_id,
-                    },
-                    {
-                        "type": "button",
-                        "action_id": "resolve_issue",
-                        "text": {"type": "plain_text", "text": "Resolve", "emoji": True},
-                        "style": "primary",
-                        "value": issue.issue_id,
-                    },
+                        "type": "mrkdwn",
+                        "text": "React with :eyes: to acknowledge or :white_check_mark: to resolve.",
+                    }
                 ],
             }
         )
@@ -158,6 +155,24 @@ def get_message_permalink(bot_token: str, channel_id: str, message_ts: str) -> s
     return response.get("permalink", "")
 
 
+def get_message_reactions(bot_token: str, channel_id: str, message_ts: str) -> tuple[SlackReaction, ...]:
+    response = _slack_api_get(
+        bot_token,
+        "reactions.get",
+        {"channel": channel_id, "timestamp": message_ts, "full": True},
+    )
+    message = response.get("message", {})
+    return tuple(
+        SlackReaction(
+            name=str(reaction.get("name", "")),
+            users=tuple(str(user) for user in reaction.get("users", [])),
+            count=int(reaction.get("count", 0) or 0),
+        )
+        for reaction in message.get("reactions", [])
+        if reaction.get("name")
+    )
+
+
 def format_helpscout_reference(value: str) -> str:
     raw = (value or "").strip()
     if not raw:
@@ -180,6 +195,22 @@ def _slack_api_call(bot_token: str, method: str, payload: dict) -> dict:
         f"https://slack.com/api/{method}",
         headers={"Authorization": f"Bearer {bot_token}", "Content-Type": "application/json; charset=utf-8"},
         json=payload,
+        timeout=15,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if not data.get("ok"):
+        raise RuntimeError(f"Slack API {method} failed: {data.get('error', 'unknown_error')}")
+    return data
+
+
+def _slack_api_get(bot_token: str, method: str, params: dict) -> dict:
+    import requests
+
+    response = requests.get(
+        f"https://slack.com/api/{method}",
+        headers={"Authorization": f"Bearer {bot_token}"},
+        params=params,
         timeout=15,
     )
     response.raise_for_status()
