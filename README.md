@@ -87,11 +87,11 @@ Add repository secrets:
 
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: full JSON key contents.
 - `PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL`: Slack incoming webhook URL.
-- `ISSUE_MEMORY_SPREADSHEET_ID`: separate Issue Memory spreadsheet ID.
 - `OPENAI_API_KEY`: OpenAI API key.
 
 Optional repository variables:
 
+- `ISSUE_MEMORY_SPREADSHEET_ID` if replacing the default Issue Memory spreadsheet.
 - `OPENAI_MODEL`
 - `ROLLING_WINDOW_DAYS`
 - `NEW_ISSUE_THRESHOLD`
