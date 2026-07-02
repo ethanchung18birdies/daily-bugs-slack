@@ -107,6 +107,8 @@ class SheetsClient:
         sheet_id = self._ensure_sheet_exists(spreadsheet_id, tab_name)
         values = self._get_values(spreadsheet_id, f"'{tab_name}'!1:1")
         current_headers = values[0] if values else []
+        target_column_count = max(len(headers), len(current_headers))
+        self._ensure_sheet_grid(spreadsheet_id, sheet_id, target_column_count)
         if not current_headers:
             self._update_values(spreadsheet_id, f"'{tab_name}'!A1:{_column_name(len(headers))}1", [list(headers)])
         else:
@@ -114,8 +116,10 @@ class SheetsClient:
             if missing_headers:
                 start_column = _column_name(len(current_headers) + 1)
                 end_column = _column_name(len(current_headers) + len(missing_headers))
+                self._ensure_sheet_grid(spreadsheet_id, sheet_id, len(current_headers) + len(missing_headers))
                 self._update_values(spreadsheet_id, f"'{tab_name}'!{start_column}1:{end_column}1", [missing_headers])
 
+    def _ensure_sheet_grid(self, spreadsheet_id: str, sheet_id: int, column_count: int) -> None:
         self.service.spreadsheets().batchUpdate(
             spreadsheetId=spreadsheet_id,
             body={
@@ -126,7 +130,7 @@ class SheetsClient:
                                 "sheetId": sheet_id,
                                 "gridProperties": {
                                     "frozenRowCount": 1,
-                                    "columnCount": len(headers),
+                                    "columnCount": column_count,
                                 },
                             },
                             "fields": "gridProperties.frozenRowCount,gridProperties.columnCount",
