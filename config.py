@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 
 DEFAULT_SOURCE_SPREADSHEET_ID = "19JPqsVsE0hU-oBF5G02HdctrQBgTBudzQvFFyQHaj28"
-DEFAULT_OPENAI_MODEL = "gpt-5-mini"
+DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
 PT = ZoneInfo("America/Los_Angeles")
 
 DEFAULT_HIGH_IMPACT_TERMS = (

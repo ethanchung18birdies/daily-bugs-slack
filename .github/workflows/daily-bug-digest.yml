@@ -87,7 +87,7 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ github.workspace }}/service-account.json
           PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL: ${{ secrets.PRODUCT_FEEDBACK_SLACK_WEBHOOK_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5-mini' }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-mini' }}
           ROLLING_WINDOW_DAYS: ${{ vars.ROLLING_WINDOW_DAYS || '7' }}
           NEW_ISSUE_THRESHOLD: ${{ vars.NEW_ISSUE_THRESHOLD || '3' }}
           HIGH_IMPACT_THRESHOLD: ${{ vars.HIGH_IMPACT_THRESHOLD || '2' }}
