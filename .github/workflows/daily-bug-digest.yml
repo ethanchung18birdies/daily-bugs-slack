@@ -3,8 +3,9 @@ name: Recurring Bug Detection
 on:
   schedule:
     # GitHub cron is UTC-only. These two runs cover 8 PM Los Angeles time
-    # during daylight saving time and standard time; the guard below skips
-    # whichever run is not 8 PM PT.
+    # during daylight saving time and standard time. GitHub may start
+    # scheduled workflows late, so the guard below uses the triggering cron
+    # string plus the current PT UTC offset instead of the delayed start time.
     - cron: "0 3 * * *"
     - cron: "0 4 * * *"
   workflow_dispatch:
@@ -49,16 +50,31 @@ jobs:
         shell: bash
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
           import os
           from datetime import datetime
           from zoneinfo import ZoneInfo
 
           event_name = os.environ["GITHUB_EVENT_NAME"]
           pt_now = datetime.now(ZoneInfo("America/Los_Angeles"))
-          should_run = event_name == "workflow_dispatch" or pt_now.hour == 20
+          triggered_schedule = ""
+          expected_schedule = ""
+          should_run = event_name == "workflow_dispatch"
+
+          if event_name == "schedule":
+              event_path = os.environ.get("GITHUB_EVENT_PATH")
+              if event_path:
+                  with open(event_path, "r", encoding="utf-8") as event_file:
+                      triggered_schedule = json.load(event_file).get("schedule", "")
+
+              pt_offset_hours = int(pt_now.utcoffset().total_seconds() // 3600)
+              expected_schedule = "0 3 * * *" if pt_offset_hours == -7 else "0 4 * * *"
+              should_run = triggered_schedule == expected_schedule
 
           print(f"should_run={str(should_run).lower()}")
           print(f"pt_time={pt_now.isoformat()}")
+          print(f"triggered_schedule={triggered_schedule}")
+          print(f"expected_schedule={expected_schedule}")
           PY
 
       - name: Write Google service account key

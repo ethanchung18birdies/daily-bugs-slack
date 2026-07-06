@@ -102,7 +102,7 @@ Do not schedule this project with local cron. GitHub Actions is the production s
 
 ## GitHub Actions
 
-Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow runs daily at 8 PM Los Angeles time and can also be triggered manually.
+Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow targets 8 PM Los Angeles time and can also be triggered manually. GitHub may start scheduled runs late; the workflow guard uses the triggering cron string and current Los Angeles UTC offset so delayed starts still process the intended daily run only once.
 
 Add repository secrets:
 
