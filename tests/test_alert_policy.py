@@ -92,12 +92,14 @@ class AlertPolicyTests(unittest.TestCase):
 
         self.assertTrue(decision.should_alert)
 
-    def test_existing_update_threshold(self) -> None:
+    def test_existing_issue_without_slack_timestamp_does_not_post_duplicate(self) -> None:
         existing = issue(last_slack_alert_sent="2026-06-01T15:00:00+00:00")
         decision = decide_alert(issue=issue(), reports=reports(3), existing_issue=existing, settings=settings())
 
-        self.assertTrue(decision.should_alert)
-        self.assertEqual(decision.alert_type, "existing_issue_update")
+        self.assertFalse(decision.should_alert)
+        self.assertEqual(decision.alert_type, "suppressed")
+        self.assertEqual(decision.reason, "existing_issue_already_alerted_without_slack_ts")
+        self.assertEqual(decision.slack_action, "none")
 
     def test_existing_issue_with_slack_message_updates_on_new_reports(self) -> None:
         existing = issue(

@@ -42,12 +42,8 @@ def decide_alert(
         else:
             reason = "existing_issue_no_new_reports"
     elif existing_issue is not None and existing_issue.last_slack_alert_sent:
-        if issue.new_since_last_alert >= settings.existing_update_threshold:
-            alert_type = "existing_issue_update"
-            should_alert = True
-            reason = "existing_update_threshold_met"
-        else:
-            reason = "existing_update_threshold_not_met"
+        alert_type = "suppressed"
+        reason = "existing_issue_already_alerted_without_slack_ts"
     else:
         threshold = settings.high_impact_threshold if is_high_impact(issue, reports, settings) else settings.new_issue_threshold
         if issue.rolling_window_count >= threshold:

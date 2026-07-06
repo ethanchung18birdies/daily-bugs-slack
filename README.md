@@ -172,6 +172,8 @@ When an alert appears in Slack:
 
 The next scheduled or manual GitHub Actions run reads reactions from each tracked Slack alert message, updates Issue Memory, and edits or deletes the same Slack parent message. `Resolved` issues continue to be matched and logged, but they stop producing Slack updates.
 
+Existing Issue Memory rows from older workflow versions may have `last_slack_alert_sent` without `slack_message_ts`. Those rows are treated as already alerted and are suppressed rather than posted again, because the workflow cannot safely update an unknown Slack parent message.
+
 ## Tests
 
 ```bash
