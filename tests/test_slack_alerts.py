@@ -5,7 +5,14 @@ import unittest
 
 from models import AlertDecision, IssueRecord
 import slack_alerts
-from slack_alerts import build_issue_alert_payload, delete_issue_alert, format_issue_alert, get_message_reactions
+from slack_alerts import (
+    build_issue_alert_payload,
+    delete_issue_alert,
+    format_issue_alert,
+    get_message_permalink,
+    get_message_reactions,
+    post_issue_alert,
+)
 
 
 def issue(**overrides) -> IssueRecord:
@@ -149,6 +156,55 @@ class SlackAlertsTests(unittest.TestCase):
             slack_alerts._slack_api_call = original
 
         self.assertEqual(calls, [("token", "chat.delete", {"channel": "C123", "ts": "123.456"})])
+
+    def test_get_message_permalink_uses_get(self) -> None:
+        calls = []
+        original = slack_alerts._slack_api_get
+        try:
+            slack_alerts._slack_api_get = lambda token, method, params: calls.append((token, method, params)) or {"permalink": "https://slack/permalink"}
+
+            permalink = get_message_permalink("token", "C123", "123.456")
+        finally:
+            slack_alerts._slack_api_get = original
+
+        self.assertEqual(permalink, "https://slack/permalink")
+        self.assertEqual(calls, [("token", "chat.getPermalink", {"channel": "C123", "message_ts": "123.456"})])
+
+    def test_post_issue_alert_keeps_ts_when_permalink_fails(self) -> None:
+        decision = AlertDecision(
+            issue_id="ISSUE-1",
+            alert_type="new_issue",
+            should_alert=True,
+            reason="threshold",
+            rolling_window_count=7,
+            new_since_last_alert=3,
+            reports=(),
+            issue_summary="Users cannot finish or save rounds.",
+            platforms={"Android": 5},
+            first_noticed=date(2026, 6, 1),
+            latest_report=date(2026, 6, 3),
+            helpscout_links=("https://secure.helpscout.net/conversation/1",),
+            slack_action="post_new",
+        )
+        original_call = slack_alerts._slack_api_call
+        original_get = slack_alerts._slack_api_get
+        try:
+            slack_alerts._slack_api_call = lambda token, method, payload: {"ok": True, "channel": "C123", "ts": "123.456"}
+
+            def fail_get(token: str, method: str, params: dict) -> dict:
+                raise RuntimeError("invalid_arguments")
+
+            slack_alerts._slack_api_get = fail_get
+
+            with self.assertLogs("slack_alerts", level="WARNING"):
+                result = post_issue_alert("token", "C123", issue(), decision)
+        finally:
+            slack_alerts._slack_api_call = original_call
+            slack_alerts._slack_api_get = original_get
+
+        self.assertEqual(result.channel_id, "C123")
+        self.assertEqual(result.message_ts, "123.456")
+        self.assertEqual(result.message_url, "")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from datetime import date
 from dataclasses import dataclass
+from datetime import date
+import logging
 from urllib.parse import urlparse
 
 from models import AlertDecision, IssueRecord
+
+
+LOGGER = logging.getLogger("slack_alerts")
 
 
 @dataclass(frozen=True)
@@ -137,7 +141,7 @@ def post_issue_alert(bot_token: str, channel_id: str, issue: IssueRecord, decisi
     return SlackMessageResult(
         channel_id=response_channel,
         message_ts=message_ts,
-        message_url=get_message_permalink(bot_token, response_channel, message_ts),
+        message_url=safe_get_message_permalink(bot_token, response_channel, message_ts),
     )
 
 
@@ -149,7 +153,7 @@ def update_issue_alert(bot_token: str, channel_id: str, message_ts: str, issue: 
     return SlackMessageResult(
         channel_id=response_channel,
         message_ts=response_ts,
-        message_url=get_message_permalink(bot_token, response_channel, response_ts),
+        message_url=safe_get_message_permalink(bot_token, response_channel, response_ts),
     )
 
 
@@ -158,8 +162,16 @@ def delete_issue_alert(bot_token: str, channel_id: str, message_ts: str) -> None
 
 
 def get_message_permalink(bot_token: str, channel_id: str, message_ts: str) -> str:
-    response = _slack_api_call(bot_token, "chat.getPermalink", {"channel": channel_id, "message_ts": message_ts})
+    response = _slack_api_get(bot_token, "chat.getPermalink", {"channel": channel_id, "message_ts": message_ts})
     return response.get("permalink", "")
+
+
+def safe_get_message_permalink(bot_token: str, channel_id: str, message_ts: str) -> str:
+    try:
+        return get_message_permalink(bot_token, channel_id, message_ts)
+    except Exception as exc:
+        LOGGER.warning("Could not get Slack permalink for %s/%s: %s", channel_id, message_ts, exc)
+        return ""
 
 
 def get_message_reactions(bot_token: str, channel_id: str, message_ts: str) -> tuple[SlackReaction, ...]:
