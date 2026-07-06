@@ -6,7 +6,7 @@ This is no longer a daily digest of every bug. The system maintains Issue Memory
 
 ## Data Flow
 
-GitHub Actions runs daily at 8 PM Los Angeles time:
+cron-job.org triggers the GitHub Actions workflow daily at 8 PM Los Angeles time:
 
 1. Read recent source reports from monthly tabs in the product feedback spreadsheet.
 2. Parse dates, feedback text, platform, device, app version, premium status, user id, tags, club/course metadata.
@@ -98,11 +98,11 @@ The legacy daily digest command still exists temporarily for manual troubleshoot
 .venv/bin/python daily_bug_digest.py --dry-run
 ```
 
-Do not schedule this project with local cron. GitHub Actions is the production scheduler so alerts continue to run when your laptop is off.
+Do not schedule this project with local cron. cron-job.org is the production scheduler so alerts continue to run when your laptop is off.
 
 ## GitHub Actions
 
-Production scheduling lives in `.github/workflows/daily-bug-digest.yml`. The workflow targets 8 PM Los Angeles time and can also be triggered manually. GitHub may start scheduled runs late; the workflow guard uses the triggering cron string and current Los Angeles UTC offset so delayed starts still process the intended daily run only once.
+`.github/workflows/daily-bug-digest.yml` is configured for `workflow_dispatch` only. GitHub Actions runs the job, but does not schedule it. Production scheduling should call the GitHub workflow dispatch API from cron-job.org at 8 PM Los Angeles time.
 
 Add repository secrets:
 
@@ -123,7 +123,36 @@ Optional repository variables:
 - `PATCHED_ALERT_THRESHOLD`
 - `HIGH_IMPACT_TERMS`
 
-Manual workflow runs default to dry-run mode. Set `dry_run=false` only when you want to post Slack alerts and write Issue Memory changes.
+Manual/API workflow runs default to dry-run mode unless the caller sends `dry_run=false`. Set `dry_run=false` only when you want to post Slack alerts and write Issue Memory changes.
+
+## cron-job.org
+
+Create a cron-job.org job that calls the GitHub workflow dispatch API:
+
+```text
+POST https://api.github.com/repos/ethanchung18birdies/daily-bugs-slack/actions/workflows/daily-bug-digest.yml/dispatches
+```
+
+Headers:
+
+```text
+Accept: application/vnd.github+json
+Authorization: Bearer YOUR_GITHUB_TOKEN
+X-GitHub-Api-Version: 2026-03-10
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "ref": "main",
+  "inputs": {
+    "run_date": "",
+    "dry_run": "false"
+  }
+}
+```
 
 ## Slack Reactions
 
