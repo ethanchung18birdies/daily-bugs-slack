@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 import unittest
 
-from issue_memory import build_updated_issue, find_existing_issue, issue_from_row, issue_to_row
+from issue_memory import build_updated_issue, find_existing_issue, issue_from_row, issue_to_row, mark_slack_reminder_sent
 from models import CleanedFeedback, IssueCluster, IssueRecord, SourceReport
 
 
@@ -46,7 +46,15 @@ class IssueMemoryTests(unittest.TestCase):
         self.assertEqual(issue.slack_message_ts, "123.456")
         self.assertEqual(issue.acknowledged_by, "Ethan")
         self.assertEqual(issue_to_row(issue)[0], "ISSUE-1")
-        self.assertEqual(len(issue_to_row(issue)), 30)
+        self.assertEqual(len(issue_to_row(issue)), 32)
+
+    def test_mark_slack_reminder_sent_tracks_count(self) -> None:
+        issue = issue_from_row({"issue_id": "ISSUE-1", "total_report_count": "7"})
+
+        updated = mark_slack_reminder_sent(issue, "2026-07-06T20:00:00+00:00")
+
+        self.assertEqual(updated.last_slack_reminder_sent, "2026-07-06T20:00:00+00:00")
+        self.assertEqual(updated.reminder_report_count, 7)
 
     def test_build_updated_issue_creates_new_issue(self) -> None:
         cluster = IssueCluster(

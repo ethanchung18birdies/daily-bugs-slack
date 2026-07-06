@@ -11,10 +11,18 @@ from alert_policy import decide_alert
 from config import PT, load_settings
 from issue_actions import apply_reaction_status
 from issue_matching import match_issues
-from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent, mark_slack_message
+from issue_memory import build_updated_issue, find_existing_issue, mark_alert_sent, mark_slack_message, mark_slack_reminder_sent
 from report_parser import month_tabs_for_window, parse_source_rows, previous_report_date, rolling_window
 from sheets_client import SheetsClient
-from slack_alerts import delete_issue_alert, format_issue_alert, get_message_reactions, post_issue_alert, send_slack_message, update_issue_alert
+from slack_alerts import (
+    delete_issue_alert,
+    format_issue_alert,
+    get_message_reactions,
+    post_issue_alert,
+    post_issue_reminder,
+    send_slack_message,
+    update_issue_alert,
+)
 
 
 LOGGER = logging.getLogger("run_detection")
@@ -74,7 +82,15 @@ def run(argv: list[str] | None = None) -> int:
         slack_result = None
         if decision.should_alert and not args.dry_run:
             if settings.slack_bot_token and settings.slack_channel_id:
-                if decision.slack_action == "update_existing":
+                if decision.slack_action == "post_reminder":
+                    slack_result = post_issue_reminder(
+                        settings.slack_bot_token,
+                        settings.slack_channel_id,
+                        updated_issue,
+                        decision,
+                    )
+                    updated_issue = mark_slack_reminder_sent(updated_issue, now_iso)
+                elif decision.slack_action == "update_existing":
                     channel_id = updated_issue.slack_channel_id or settings.slack_channel_id
                     slack_result = update_issue_alert(
                         settings.slack_bot_token,
@@ -109,7 +125,10 @@ def run(argv: list[str] | None = None) -> int:
             else:
                 message = format_issue_alert(decision)
                 send_slack_message(settings.slack_webhook_url, message)
-                updated_issue = mark_alert_sent(updated_issue, now_iso)
+                if decision.slack_action == "post_reminder":
+                    updated_issue = mark_slack_reminder_sent(updated_issue, now_iso)
+                else:
+                    updated_issue = mark_alert_sent(updated_issue, now_iso)
             sheets.upsert_issue(updated_issue)
             sheets.append_alert_log(
                 [

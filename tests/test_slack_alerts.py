@@ -7,11 +7,13 @@ from models import AlertDecision, IssueRecord
 import slack_alerts
 from slack_alerts import (
     build_issue_alert_payload,
+    build_issue_reminder_payload,
     delete_issue_alert,
     format_issue_alert,
     get_message_permalink,
     get_message_reactions,
     post_issue_alert,
+    post_issue_reminder,
 )
 
 
@@ -124,6 +126,29 @@ class SlackAlertsTests(unittest.TestCase):
 
         self.assertFalse(any(block["type"] == "context" for block in payload["blocks"]))
 
+    def test_build_issue_reminder_payload_is_distinct(self) -> None:
+        decision = AlertDecision(
+            issue_id="ISSUE-1",
+            alert_type="stale_unresolved_reminder",
+            should_alert=True,
+            reason="unresolved_issue_stale_with_new_reports",
+            rolling_window_count=7,
+            new_since_last_alert=3,
+            reports=(),
+            issue_summary="Users cannot finish or save rounds.",
+            platforms={"Android": 5},
+            first_noticed=date(2026, 6, 1),
+            latest_report=date(2026, 6, 3),
+            helpscout_links=("https://secure.helpscout.net/conversation/1",),
+            slack_action="post_reminder",
+        )
+
+        payload = build_issue_reminder_payload(issue(slack_message_url="https://slack/original"), decision)
+
+        self.assertEqual(payload["text"], "Reminder: unresolved bug still receiving reports - Users cannot finish or save rounds.")
+        self.assertIn("Recurring Bug Reminder", str(payload["blocks"]))
+        self.assertIn("Original alert", str(payload["blocks"]))
+
     def test_get_message_reactions_parses_slack_response(self) -> None:
         original = slack_alerts._slack_api_get
         try:
@@ -205,6 +230,39 @@ class SlackAlertsTests(unittest.TestCase):
         self.assertEqual(result.channel_id, "C123")
         self.assertEqual(result.message_ts, "123.456")
         self.assertEqual(result.message_url, "")
+
+    def test_post_issue_reminder_posts_message(self) -> None:
+        decision = AlertDecision(
+            issue_id="ISSUE-1",
+            alert_type="stale_unresolved_reminder",
+            should_alert=True,
+            reason="unresolved_issue_stale_with_new_reports",
+            rolling_window_count=7,
+            new_since_last_alert=3,
+            reports=(),
+            issue_summary="Users cannot finish or save rounds.",
+            platforms={"Android": 5},
+            first_noticed=date(2026, 6, 1),
+            latest_report=date(2026, 6, 3),
+            helpscout_links=("https://secure.helpscout.net/conversation/1",),
+            slack_action="post_reminder",
+        )
+        calls = []
+        original_call = slack_alerts._slack_api_call
+        original_get = slack_alerts._slack_api_get
+        try:
+            slack_alerts._slack_api_call = lambda token, method, payload: calls.append((method, payload)) or {"ok": True, "channel": "C123", "ts": "999.000"}
+            slack_alerts._slack_api_get = lambda token, method, params: {"permalink": "https://slack/reminder"}
+
+            result = post_issue_reminder("token", "C123", issue(), decision)
+        finally:
+            slack_alerts._slack_api_call = original_call
+            slack_alerts._slack_api_get = original_get
+
+        self.assertEqual(calls[0][0], "chat.postMessage")
+        self.assertIn("Recurring Bug Reminder", str(calls[0][1]["blocks"]))
+        self.assertEqual(result.message_ts, "999.000")
+        self.assertEqual(result.message_url, "https://slack/reminder")
 
 
 if __name__ == "__main__":

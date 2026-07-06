@@ -62,6 +62,8 @@ class IssueRecord:
     resolved_by: str = ""
     slack_message_deleted_at: str = ""
     slack_message_deleted_by: str = ""
+    last_slack_reminder_sent: str = ""
+    reminder_report_count: int = 0
     row_number: int | None = None
 
 

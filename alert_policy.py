@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from config import Settings
 from models import AlertDecision, IssueRecord, SourceReport
@@ -26,6 +26,10 @@ def decide_alert(
     if issue.status in {"Resolved", "Closed", "Dismissed"}:
         reason = f"issue_status_{issue.status.casefold()}"
         alert_type = "suppressed"
+    elif _should_send_stale_reminder(issue):
+        alert_type = "stale_unresolved_reminder"
+        should_alert = True
+        reason = "unresolved_issue_stale_with_new_reports"
     elif issue.status == "Patched" and issue.patch_date:
         post_patch_count = _reports_after(issue.patch_date, reports)
         if post_patch_count >= settings.patched_alert_threshold:
@@ -93,6 +97,36 @@ def _slack_action(issue: IssueRecord, should_alert: bool, reason: str) -> str:
         return "suppress_status"
     if not should_alert:
         return "none"
+    if reason == "unresolved_issue_stale_with_new_reports":
+        return "post_reminder"
     if issue.slack_channel_id and issue.slack_message_ts:
         return "update_existing"
     return "post_new"
+
+
+def _should_send_stale_reminder(issue: IssueRecord) -> bool:
+    if issue.status in {"Resolved", "Closed", "Dismissed", "Patched"}:
+        return False
+    first_alert = _datetime_part(issue.last_slack_alert_sent)
+    if not first_alert:
+        return False
+    if issue.last_slack_reminder_sent and issue.total_report_count <= issue.reminder_report_count:
+        return False
+    if issue.last_slack_reminder_sent:
+        last_reminder = _datetime_part(issue.last_slack_reminder_sent)
+        if last_reminder and issue.updated_at and _datetime_part(issue.updated_at) <= last_reminder:
+            return False
+    age = datetime.now(timezone.utc) - first_alert
+    return age.days >= 3
+
+
+def _datetime_part(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

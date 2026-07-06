@@ -101,6 +101,49 @@ class AlertPolicyTests(unittest.TestCase):
         self.assertEqual(decision.reason, "existing_issue_already_alerted_without_slack_ts")
         self.assertEqual(decision.slack_action, "none")
 
+    def test_stale_unresolved_issue_posts_reminder_after_three_days(self) -> None:
+        existing = issue(
+            last_slack_alert_sent="2000-01-01T00:00:00+00:00",
+            slack_channel_id="C123",
+            slack_message_ts="123.456",
+        )
+        current = issue(
+            last_slack_alert_sent="2000-01-01T00:00:00+00:00",
+            slack_channel_id="C123",
+            slack_message_ts="123.456",
+            total_report_count=3,
+            new_since_last_alert=0,
+        )
+
+        decision = decide_alert(issue=current, reports=reports(3), existing_issue=existing, settings=settings())
+
+        self.assertTrue(decision.should_alert)
+        self.assertEqual(decision.alert_type, "stale_unresolved_reminder")
+        self.assertEqual(decision.slack_action, "post_reminder")
+
+    def test_stale_reminder_waits_for_more_reports_after_previous_reminder(self) -> None:
+        existing = issue(
+            last_slack_alert_sent="2000-01-01T00:00:00+00:00",
+            last_slack_reminder_sent="2000-01-05T00:00:00+00:00",
+            reminder_report_count=3,
+            slack_channel_id="C123",
+            slack_message_ts="123.456",
+        )
+        current = issue(
+            last_slack_alert_sent="2000-01-01T00:00:00+00:00",
+            last_slack_reminder_sent="2000-01-05T00:00:00+00:00",
+            reminder_report_count=3,
+            slack_channel_id="C123",
+            slack_message_ts="123.456",
+            total_report_count=3,
+            new_since_last_alert=0,
+        )
+
+        decision = decide_alert(issue=current, reports=reports(3), existing_issue=existing, settings=settings())
+
+        self.assertFalse(decision.should_alert)
+        self.assertEqual(decision.slack_action, "none")
+
     def test_existing_issue_with_slack_message_updates_on_new_reports(self) -> None:
         existing = issue(
             last_slack_alert_sent="2026-06-01T15:00:00+00:00",

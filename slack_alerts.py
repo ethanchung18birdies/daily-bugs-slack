@@ -125,6 +125,64 @@ def build_issue_alert_payload(issue: IssueRecord, decision: AlertDecision) -> di
     return {"text": text, "blocks": blocks, "unfurl_links": False, "unfurl_media": False}
 
 
+def build_issue_reminder_payload(issue: IssueRecord, decision: AlertDecision) -> dict:
+    text = f"Reminder: unresolved bug still receiving reports - {decision.issue_summary}"
+    blocks = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": "Recurring Bug Reminder", "emoji": True},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    "*Unresolved issue needs a check-in.*\n"
+                    f"*Status:* {_escape_mrkdwn(issue.status)}\n"
+                    f"*Issue ID:* {_escape_mrkdwn(issue.issue_id)}"
+                ),
+            },
+        },
+        {"type": "section", "text": {"type": "mrkdwn", "text": f"*Issue Summary:*\n{_escape_mrkdwn(decision.issue_summary)}"}},
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        "*Report Volume:*\n"
+                        f"{decision.rolling_window_count} in window\n"
+                        f"{decision.new_since_last_alert} new since last update"
+                    ),
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        "*Dates:*\n"
+                        f"First: {_display_date(decision.first_noticed)}\n"
+                        f"Latest: {_display_date(decision.latest_report)}"
+                    ),
+                },
+            ],
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Help Scout Links:*\n{_format_helpscout_links(decision.helpscout_links)}",
+            },
+        },
+    ]
+    if issue.slack_message_url:
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": f"Original alert: <{issue.slack_message_url}|open message>"}],
+            }
+        )
+    return {"text": text, "blocks": blocks, "unfurl_links": False, "unfurl_media": False}
+
+
 def send_slack_message(webhook_url: str, message: str) -> str:
     import requests
 
@@ -135,6 +193,18 @@ def send_slack_message(webhook_url: str, message: str) -> str:
 
 def post_issue_alert(bot_token: str, channel_id: str, issue: IssueRecord, decision: AlertDecision) -> SlackMessageResult:
     payload = {"channel": channel_id, **build_issue_alert_payload(issue, decision)}
+    response = _slack_api_call(bot_token, "chat.postMessage", payload)
+    response_channel = response.get("channel", channel_id)
+    message_ts = response["ts"]
+    return SlackMessageResult(
+        channel_id=response_channel,
+        message_ts=message_ts,
+        message_url=safe_get_message_permalink(bot_token, response_channel, message_ts),
+    )
+
+
+def post_issue_reminder(bot_token: str, channel_id: str, issue: IssueRecord, decision: AlertDecision) -> SlackMessageResult:
+    payload = {"channel": channel_id, **build_issue_reminder_payload(issue, decision)}
     response = _slack_api_call(bot_token, "chat.postMessage", payload)
     response_channel = response.get("channel", channel_id)
     message_ts = response["ts"]

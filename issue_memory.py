@@ -40,6 +40,8 @@ ISSUE_MEMORY_COLUMNS = (
     "resolved_by",
     "slack_message_deleted_at",
     "slack_message_deleted_by",
+    "last_slack_reminder_sent",
+    "reminder_report_count",
 )
 
 ALERT_LOG_COLUMNS = (
@@ -98,6 +100,8 @@ def issue_from_row(row: dict[str, str], row_number: int | None = None) -> IssueR
         resolved_by=row.get("resolved_by", "").strip(),
         slack_message_deleted_at=row.get("slack_message_deleted_at", "").strip(),
         slack_message_deleted_by=row.get("slack_message_deleted_by", "").strip(),
+        last_slack_reminder_sent=row.get("last_slack_reminder_sent", "").strip(),
+        reminder_report_count=_int(row.get("reminder_report_count", "")),
         row_number=row_number,
     )
 
@@ -134,6 +138,8 @@ def issue_to_row(issue: IssueRecord) -> list[str | int]:
         issue.resolved_by,
         issue.slack_message_deleted_at,
         issue.slack_message_deleted_by,
+        issue.last_slack_reminder_sent,
+        issue.reminder_report_count,
     ]
 
 
@@ -193,6 +199,8 @@ def build_updated_issue(
         resolved_by=existing.resolved_by if existing else "",
         slack_message_deleted_at=existing.slack_message_deleted_at if existing else "",
         slack_message_deleted_by=existing.slack_message_deleted_by if existing else "",
+        last_slack_reminder_sent=existing.last_slack_reminder_sent if existing else "",
+        reminder_report_count=existing.reminder_report_count if existing else 0,
         row_number=existing.row_number if existing else None,
     )
 
@@ -223,6 +231,17 @@ def mark_slack_message(
     if is_new_alert:
         values["last_slack_alert_sent"] = sent_at
     return IssueRecord(**values)
+
+
+def mark_slack_reminder_sent(issue: IssueRecord, sent_at: str) -> IssueRecord:
+    return IssueRecord(
+        **{
+            **issue.__dict__,
+            "last_slack_reminder_sent": sent_at,
+            "reminder_report_count": issue.total_report_count,
+            "updated_at": sent_at,
+        }
+    )
 
 
 def format_platform_counts(counts: Counter[str]) -> str:

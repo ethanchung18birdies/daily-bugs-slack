@@ -174,6 +174,8 @@ The next scheduled or manual GitHub Actions run reads reactions from each tracke
 
 Existing Issue Memory rows from older workflow versions may have `last_slack_alert_sent` without `slack_message_ts`. Those rows are treated as already alerted and are suppressed rather than posted again, because the workflow cannot safely update an unknown Slack parent message.
 
+Unresolved issues can still create reminder messages. If an issue is at least three days past its first Slack alert and has not been resolved, the workflow posts a new reminder message in the channel. After a reminder is sent, another reminder is suppressed until the issue accumulates more reports than it had at the previous reminder.
+
 ## Tests
 
 ```bash
